@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CleanTrack</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F5F3EE;
+  --surface: #FFFFFF;
+  --surface2: #ECEAE4;
+  --border: #D8D5CC;
+  --border2: #C4C0B4;
+  --text: #1A1917;
+  --text2: #6B6860;
+  --text3: #9E9B94;
+  --accent: #2A6E4A;
+  --accent-light: #E1F0E8;
+  --accent-mid: #8FC4A8;
+  --warn: #B05A1A;
+  --warn-light: #FCEEDE;
+  --danger: #8B2020;
+  --danger-light: #FAEAEA;
+  --node-done: #2A6E4A;
+  --node-done-bg: #D4EDE1;
+  --node-todo: #FFFFFF;
+  --node-border: #C4C0B4;
+  --path-done: #8FC4A8;
+  --path-todo: #D8D5CC;
+  --header-h: 64px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+#header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  height: var(--header-h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  gap: 12px;
+}
+#header .brand { font-family: 'Instrument Serif', serif; font-size: 22px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+#header .brand span { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); font-weight: 400; letter-spacing: 0.05em; background: var(--surface2); padding: 3px 7px; border-radius: 4px; }
+#progress-ring-wrap { display: flex; align-items: center; gap: 10px; }
+#progress-text { text-align: right; }
+#progress-text .pct { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--accent); line-height: 1; }
+#progress-text .pct-label { font-size: 11px; color: var(--text3); }
+.ring { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--surface2); stroke-width: 3; }
+.ring-fill { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; }
+#header-actions { display: flex; gap: 6px; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid var(--border);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--text2); font-size: 16px; transition: background 0.15s, border-color 0.15s;
+}
+.icon-btn:hover { background: var(--surface2); border-color: var(--border2); }
+.icon-btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.icon-btn.accent:hover { background: #235c3d; }
+
+/* MAIN NAV TABS */
+#main-nav {
+  display: flex; border-bottom: 1px solid var(--border);
+  background: var(--surface); padding: 0 16px;
+  gap: 0; overflow-x: auto; scrollbar-width: none;
+}
+#main-nav::-webkit-scrollbar { display: none; }
+.nav-tab {
+  font-size: 13px; font-weight: 500; color: var(--text2);
+  padding: 10px 16px; border: none; background: none; cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s;
+}
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-tab:hover:not(.active) { color: var(--text); }
+
+/* PAGES */
+.page { display: none; padding: 16px; max-width: 700px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* SESSION PAGE */
+#session-page .room-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.room-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid var(--border);
+}
+.room-header:hover { background: var(--surface2); }
+.room-name { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.room-badge {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  background: var(--surface2); color: var(--text2);
+  padding: 2px 7px; border-radius: 4px; font-weight: 400;
+}
+.room-badge.done-badge { background: var(--node-done-bg); color: var(--node-done); }
+.room-steps-wrap { padding: 16px; }
+/* NODE PATH */
+.node-path {
+  display: flex; align-items: center; flex-wrap: nowrap;
+  gap: 0; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: thin;
+}
+.node-wrap { display: flex; align-items: center; flex-shrink: 0; }
+.node-connector {
+  width: 24px; height: 3px;
+  background: var(--path-todo); transition: background 0.4s; flex-shrink: 0;
+}
+.node-connector.done { background: var(--path-done); }
+.node {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid var(--node-border);
+  background: var(--node-todo); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+  color: var(--text2); transition: all 0.25s; flex-shrink: 0;
+  position: relative; user-select: none;
+}
+.node:hover { transform: scale(1.1); border-color: var(--accent-mid); }
+.node.done {
+  background: var(--node-done-bg); border-color: var(--node-done);
+  color: var(--node-done);
+}
+.node.done::after {
+  content: '✓'; position: absolute; font-size: 18px;
+  font-family: system-ui; font-weight: 700;
+}
+.node.done .node-num { display: none; }
+.node-num { font-size: 11px; }
+.node-label {
+  font-size: 10px; color: var(--text3); text-align: center;
+  margin-top: 4px; max-width: 52px; line-height: 1.3; word-break: break-word;
+}
+.node-item { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+/* date stamp on room */
+.room-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+/* session header */
+.session-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.session-title { font-family: 'Instrument Serif', serif; font-size: 24px; }
+.session-meta { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'DM Mono', monospace; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13px;
+  font-weight: 500; cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn:hover { background: var(--surface2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #235c3d; }
+.btn.danger { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+.btn.sm { padding: 6px 12px; font-size: 12px; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.no-session {
+  text-align: center; padding: 48px 24px; color: var(--text2);
+}
+.no-session h3 { font-family: 'Instrument Serif', serif; font-size: 22px; color: var(--text); margin-bottom: 8px; }
+.no-session p { font-size: 14px; margin-bottom: 20px; }
+
+/* HISTORY PAGE */
+.hist-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+  cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow);
+}
+.hist-card:hover { border-color: var(--border2); box-shadow: var(--shadow-md); }
+.hist-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.hist-card-title { font-weight: 600; font-size: 15px; }
+.hist-card-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+.hist-progress { margin-top: 10px; }
+.progress-bar-wrap { background: var(--surface2); border-radius: 4px; height: 5px; margin-top: 6px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s; }
+.hist-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.hist-tag { font-size: 11px; color: var(--text3); }
+.hist-actions { display: flex; gap: 6px; }
+.chip { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: 'DM Mono', monospace; }
+.chip.done { background: var(--node-done-bg); color: var(--node-done); }
+.chip.partial { background: var(--warn-light); color: var(--warn); }
+.chip.empty { background: var(--surface2); color: var(--text3); }
+.no-hist { text-align: center; padding: 40px; color: var(--text3); font-size: 14px; }
+
+/* CONFIG PAGE */
+.config-section { margin-bottom: 28px; }
+.config-section h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 12px; }
+.config-list { display: flex; flex-direction: column; gap: 6px; }
+.config-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.config-item .handle { color: var(--text3); cursor: grab; font-size: 14px; user-select: none; }
+.config-item .item-label { flex: 1; font-size: 14px; font-weight: 500; }
+.config-item .item-actions { display: flex; gap: 4px; }
+.config-item .item-actions button {
+  width: 28px; height: 28px; border-radius: 6px; border: none;
+  background: transparent; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2); transition: background 0.15s;
+}
+.config-item .item-actions button:hover { background: var(--surface2); }
+.config-item .item-actions button.del:hover { background: var(--danger-light); color: var(--danger); }
+.add-item-row { display: flex; gap: 8px; margin-top: 8px; }
+.add-item-row input { flex: 1; }
+input[type="text"] {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 14px;
+  color: var(--text); font-family: 'DM Sans', sans-serif;
+  transition: border-color 0.15s; outline: none;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+
+/* DATA PAGE */
+.data-section { margin-bottom: 24px; }
+.data-section h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 12px; }
+.data-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--text2); overflow-x: auto; max-height: 180px; overflow-y: auto;
+  line-height: 1.6;
+}
+textarea.data-import {
+  width: 100%; min-height: 120px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--text2); resize: vertical; outline: none;
+  font-family: 'DM Mono', monospace;
+}
+textarea.data-import:focus { border-color: var(--accent); }
+.alert { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 12px; }
+.alert.success { background: var(--accent-light); color: var(--accent); }
+.alert.error { background: var(--danger-light); color: var(--danger); }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; display: flex; align-items: flex-end;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-height: 90vh; overflow-y: auto;
+  padding: 20px 16px 32px; transform: translateY(32px);
+  transition: transform 0.25s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal h2 { font-family: 'Instrument Serif', serif; font-size: 22px; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin-bottom: 6px; }
+.form-group input { width: 100%; }
+
+/* NODE TOOLTIP */
+.node-tooltip {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--text); color: #fff; font-size: 11px; white-space: nowrap;
+  padding: 4px 8px; border-radius: 5px; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s; z-index: 10;
+}
+.node-item:hover .node-tooltip { opacity: 1; }
+.node-item { position: relative; }
+
+/* RESPONSIVE */
+@media (min-width: 480px) {
+  .node { width: 48px; height: 48px; }
+  .node-connector { width: 32px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="brand">
+    CleanTrack <span id="header-session-name">—</span>
+  </div>
+  <div id="progress-ring-wrap">
+    <div id="progress-text">
+      <div class="pct" id="pct-display">0%</div>
+      <div class="pct-label" id="steps-display">0 / 0</div>
+    </div>
+    <svg width="38" height="38" class="ring" viewBox="0 0 38 38">
+      <circle class="ring-bg" cx="19" cy="19" r="16"/>
+      <circle class="ring-fill" id="ring-fill" cx="19" cy="19" r="16" stroke-dasharray="100.5" stroke-dashoffset="100.5"/>
+    </svg>
+  </div>
+  <div id="header-actions">
+    <button class="icon-btn" id="new-session-btn" title="Nueva hoja">＋</button>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav id="main-nav">
+  <button class="nav-tab active" data-page="session">Sesión</button>
+  <button class="nav-tab" data-page="history">Historial</button>
+  <button class="nav-tab" data-page="config">Configurar</button>
+  <button class="nav-tab" data-page="data">Datos</button>
+</nav>
+
+<!-- SESSION PAGE -->
+<div class="page active" id="session-page">
+  <div id="session-content"></div>
+</div>
+
+<!-- HISTORY PAGE -->
+<div class="page" id="history-page">
+  <div id="history-list"></div>
+</div>
+
+<!-- CONFIG PAGE -->
+<div class="page" id="config-page">
+  <div class="config-section">
+    <h3>Estancias</h3>
+    <div class="config-list" id="rooms-config-list"></div>
+    <div class="add-item-row">
+      <input type="text" id="new-room-input" placeholder="Nueva estancia…" maxlength="40">
+      <button class="btn primary sm" id="add-room-btn">Añadir</button>
+    </div>
+  </div>
+  <div class="config-section">
+    <h3>Pasos de limpieza</h3>
+    <div class="config-list" id="steps-config-list"></div>
+    <div class="add-item-row">
+      <input type="text" id="new-step-input" placeholder="Nuevo paso…" maxlength="40">
+      <button class="btn primary sm" id="add-step-btn">Añadir</button>
+    </div>
+  </div>
+  <div class="alert" id="config-alert" style="display:none;"></div>
+</div>
+
+<!-- DATA PAGE -->
+<div class="page" id="data-page">
+  <div class="data-section">
+    <h3>Exportar</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Descarga todos tus datos en JSON para guardar o mover a otro dispositivo.</p>
+    <button class="btn primary" id="export-btn">⬇ Exportar JSON</button>
+  </div>
+  <div class="data-section">
+    <h3>Importar</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Pega un JSON exportado previamente. Esto <strong>reemplazará</strong> todos los datos actuales.</p>
+    <textarea class="data-import" id="import-textarea" placeholder='{"sessions":[],"config":…}'></textarea>
+    <div style="margin-top:8px;">
+      <button class="btn danger sm" id="import-btn">⬆ Importar (reemplazar)</button>
+    </div>
+    <div id="data-alert" style="display:none;" class="alert" style="margin-top:10px;"></div>
+  </div>
+  <div class="data-section">
+    <h3>Vista previa de datos</h3>
+    <div class="data-box" id="data-preview"></div>
+  </div>
+  <div class="data-section" style="margin-top:8px;">
+    <button class="btn danger sm" id="clear-all-btn">🗑 Borrar todos los datos</button>
+  </div>
+</div>
+
+<!-- NEW SESSION MODAL -->
+<div class="modal-overlay" id="new-session-modal">
+  <div class="modal">
+    <h2>Nueva hoja de limpieza</h2>
+    <div class="form-group">
+      <label>Nombre de la sesión</label>
+      <input type="text" id="session-name-input" placeholder="Ej: Limpieza semanal" maxlength="60">
+    </div>
+    <p style="font-size:13px;color:var(--text2);">Se crearán <span id="modal-info"></span> nodos en total.</p>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancelar</button>
+      <button class="btn primary" id="modal-create">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT NODE MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h2 id="edit-modal-title">Editar nodo</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;" id="edit-modal-desc"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;" id="edit-modal-actions">
+      <button class="btn primary" id="edit-mark-done">✓ Marcar completado</button>
+      <button class="btn" id="edit-mark-todo">✕ Marcar pendiente</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="edit-modal-close">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- RENAME MODAL -->
+<div class="modal-overlay" id="rename-modal">
+  <div class="modal">
+    <h2>Renombrar sesión</h2>
+    <div class="form-group">
+      <label>Nuevo nombre</label>
+      <input type="text" id="rename-input" placeholder="Nombre de la sesión" maxlength="60">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="rename-cancel">Cancelar</button>
+      <button class="btn primary" id="rename-confirm">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LS_KEY = 'cleantrack_v1';
+
+const DEFAULT_CONFIG = {
+  rooms: ['Salón','Cocina','Dormitorio','Baño','Pasillo'],
+  steps: ['Recoger','Polvo','Barrer','Trapo','Fregona']
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { sessions: [], activeSessionId: null, config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)) };
+}
+
+function save(state) {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+let state = load();
+let editTarget = null;
+let activeNodeTarget = null;
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function calcProgress(session) {
+  let done = 0, total = 0;
+  for (const room of session.rooms) {
+    for (const step of room.steps) {
+      total++;
+      if (step.done) done++;
+    }
+  }
+  return { done, total, pct: total === 0 ? 0 : Math.round((done/total)*100) };
+}
+
+function getActiveSession() {
+  if (!state.activeSessionId) return null;
+  return state.sessions.find(s => s.id === state.activeSessionId) || null;
+}
+
+/* ---- HEADER UPDATE ---- */
+function updateHeader() {
+  const sess = getActiveSession();
+  const nameEl = document.getElementById('header-session-name');
+  const pctEl = document.getElementById('pct-display');
+  const stepsEl = document.getElementById('steps-display');
+  const ring = document.getElementById('ring-fill');
+  const circ = 2 * Math.PI * 16;
+
+  if (!sess) {
+    nameEl.textContent = '—';
+    pctEl.textContent = '0%';
+    stepsEl.textContent = '0 / 0';
+    ring.style.strokeDashoffset = circ;
+    return;
+  }
+  const { done, total, pct } = calcProgress(sess);
+  nameEl.textContent = sess.name.length > 16 ? sess.name.slice(0,14)+'…' : sess.name;
+  pctEl.textContent = pct + '%';
+  stepsEl.textContent = `${done} / ${total}`;
+  ring.style.strokeDasharray = circ;
+  ring.style.strokeDashoffset = circ - (pct / 100) * circ;
+}
+
+/* ---- SESSION PAGE ---- */
+function renderSessionPage() {
+  const sess = getActiveSession();
+  const cont = document.getElementById('session-content');
+
+  if (!sess) {
+    cont.innerHTML = `
+      <div class="no-session">
+        <h3>Sin sesión activa</h3>
+        <p>Crea una nueva hoja para empezar a limpiar por fases.</p>
+        <button class="btn primary" onclick="openNewSessionModal()">＋ Nueva hoja</button>
+      </div>`;
+    return;
+  }
+
+  const { done, total, pct } = calcProgress(sess);
+  let html = `
+    <div class="session-header">
+      <div>
+        <div class="session-title">${escHtml(sess.name)}</div>
+        <div class="session-meta">${fmtDate(sess.createdAt)}</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn sm" onclick="openRenameModal()">✏</button>
+        <button class="btn sm danger" onclick="finishSession()">Finalizar</button>
+      </div>
+    </div>`;
+
+  for (const room of sess.rooms) {
+    const roomDone = room.steps.filter(s=>s.done).length;
+    const roomTotal = room.steps.length;
+    const allDone = roomDone === roomTotal;
+    html += `
+      <div class="room-card" id="room-${room.id}">
+        <div class="room-header" onclick="toggleRoom('${room.id}')">
+          <div class="room-name">
+            <span>${escHtml(room.name)}</span>
+            <span class="room-badge ${allDone?'done-badge':''}">${roomDone}/${roomTotal}</span>
+          </div>
+          <div class="room-date" id="room-date-${room.id}">${room.lastUpdated ? fmtDate(room.lastUpdated) : ''}</div>
+        </div>
+        <div class="room-steps-wrap" id="room-body-${room.id}">
+          <div class="node-path">`;
+
+    room.steps.forEach((step, i) => {
+      if (i > 0) {
+        html += `<div class="node-connector ${step.done?'done':''}" id="conn-${room.id}-${i}"></div>`;
+      }
+      html += `
+            <div class="node-item">
+              <div class="node ${step.done?'done':''}" id="node-${room.id}-${i}"
+                onclick="toggleNode('${sess.id}','${room.id}',${i})"
+                oncontextmenu="return false;">
+                <span class="node-num">${i+1}</span>
+              </div>
+              <div class="node-label">${escHtml(step.name)}</div>
+              <div class="node-tooltip">${escHtml(step.name)}</div>
+            </div>`;
+    });
+
+    html += `</div></div></div>`;
+  }
+
+  cont.innerHTML = html;
+}
+
+function toggleRoom(roomId) {
+  const body = document.getElementById(`room-body-${roomId}`);
+  if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
+}
+
+function toggleNode(sessId, roomId, stepIdx) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess) return;
+  const room = sess.rooms.find(r => r.id === roomId);
+  if (!room) return;
+  room.steps[stepIdx].done = !room.steps[stepIdx].done;
+  room.lastUpdated = Date.now();
+  sess.updatedAt = Date.now();
+  save(state);
+  updateHeader();
+  refreshNodeUI(sessId, roomId, stepIdx);
+  updateRoomBadge(room);
+}
+
+function refreshNodeUI(sessId, roomId, stepIdx) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess) return;
+  const room = sess.rooms.find(r => r.id === roomId);
+  if (!room) return;
+
+  const nodeEl = document.getElementById(`node-${roomId}-${stepIdx}`);
+  if (nodeEl) {
+    if (room.steps[stepIdx].done) nodeEl.classList.add('done');
+    else nodeEl.classList.remove('done');
+  }
+  if (stepIdx > 0) {
+    const conn = document.getElementById(`conn-${roomId}-${stepIdx}`);
+    if (conn) {
+      if (room.steps[stepIdx].done) conn.classList.add('done');
+      else conn.classList.remove('done');
+    }
+  }
+}
+
+function updateRoomBadge(room) {
+  const badge = document.querySelector(`#room-${room.id} .room-badge`);
+  const dateEl = document.getElementById(`room-date-${room.id}`);
+  if (!badge) return;
+  const done = room.steps.filter(s=>s.done).length;
+  const total = room.steps.length;
+  badge.textContent = `${done}/${total}`;
+  badge.className = `room-badge ${done===total?'done-badge':''}`;
+  if (dateEl) dateEl.textContent = room.lastUpdated ? fmtDate(room.lastUpdated) : '';
+}
+
+function finishSession() {
+  if (!confirm('¿Finalizar sesión activa? Quedará en el historial.')) return;
+  const sess = getActiveSession();
+  if (sess) { sess.finished = true; sess.finishedAt = Date.now(); }
+  state.activeSessionId = null;
+  save(state);
+  renderSessionPage();
+  updateHeader();
+}
+
+/* ---- HISTORY PAGE ---- */
+function renderHistoryPage() {
+  const cont = document.getElementById('history-list');
+  const sessions = [...state.sessions].sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+  if (!sessions.length) {
+    cont.innerHTML = '<div class="no-hist">No hay sesiones guardadas aún.</div>';
+    return;
+  }
+  let html = '';
+  for (const sess of sessions) {
+    const { done, total, pct } = calcProgress(sess);
+    const isActive = sess.id === state.activeSessionId;
+    const chip = pct===100 ? '<span class="chip done">Completa</span>' : pct===0 ? '<span class="chip empty">Sin iniciar</span>' : `<span class="chip partial">${pct}%</span>`;
+    html += `
+      <div class="hist-card" onclick="openHistSession('${sess.id}')">
+        <div class="hist-card-header">
+          <div>
+            <div class="hist-card-title">${escHtml(sess.name)} ${isActive?'<span style="font-size:11px;color:var(--accent);font-family:\'DM Mono\',monospace;">[activa]</span>':''}</div>
+            <div class="hist-card-date">${fmtDate(sess.createdAt)}</div>
+          </div>
+          ${chip}
+        </div>
+        <div class="hist-progress">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);">
+            <span>${done} de ${total} pasos</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+        </div>
+        <div class="hist-footer">
+          <div class="hist-tag">${sess.rooms.length} estancias · ${sess.rooms[0]?.steps.length||0} pasos</div>
+          <div class="hist-actions" onclick="event.stopPropagation()">
+            <button class="btn sm" onclick="setActiveSession('${sess.id}')">Activar</button>
+            <button class="btn sm danger" onclick="deleteSession('${sess.id}')">Borrar</button>
+          </div>
+        </div>
+      </div>`;
+  }
+  cont.innerHTML = html;
+}
+
+function openHistSession(sessId) {
+  setActiveSession(sessId);
+  switchPage('session');
+}
+
+function setActiveSession(sessId) {
+  state.activeSessionId = sessId;
+  save(state);
+  renderSessionPage();
+  renderHistoryPage();
+  updateHeader();
+}
+
+function deleteSession(sessId) {
+  if (!confirm('¿Eliminar esta sesión del historial?')) return;
+  state.sessions = state.sessions.filter(s => s.id !== sessId);
+  if (state.activeSessionId === sessId) state.activeSessionId = null;
+  save(state);
+  renderSessionPage();
+  renderHistoryPage();
+  updateHeader();
+}
+
+/* ---- CONFIG PAGE ---- */
+function renderConfigPage() {
+  renderConfigList('rooms-config-list', state.config.rooms, 'room');
+  renderConfigList('steps-config-list', state.config.steps, 'step');
+}
+
+function renderConfigList(containerId, items, type) {
+  const cont = document.getElementById(containerId);
+  let html = '';
+  items.forEach((item, i) => {
+    html += `
+      <div class="config-item" id="${type}-item-${i}">
+        <span class="handle">⠿</span>
+        <span class="item-label" id="${type}-label-${i}" ondblclick="editConfigItem('${type}',${i})">${escHtml(item)}</span>
+        <div class="item-actions">
+          <button onclick="editConfigItem('${type}',${i})" title="Editar">✏</button>
+          <button class="del" onclick="deleteConfigItem('${type}',${i})" title="Eliminar">✕</button>
+        </div>
+      </div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function editConfigItem(type, idx) {
+  const arr = type === 'room' ? state.config.rooms : state.config.steps;
+  const newVal = prompt('Editar:', arr[idx]);
+  if (!newVal || !newVal.trim()) return;
+  arr[idx] = newVal.trim();
+  save(state);
+  renderConfigPage();
+  showConfigAlert('Guardado.', 'success');
+}
+
+function deleteConfigItem(type, idx) {
+  const arr = type === 'room' ? state.config.rooms : state.config.steps;
+  if (arr.length <= 1) { showConfigAlert('Debe haber al menos un elemento.', 'error'); return; }
+  if (!confirm(`¿Eliminar "${arr[idx]}"?`)) return;
+  arr.splice(idx, 1);
+  save(state);
+  renderConfigPage();
+}
+
+function showConfigAlert(msg, type) {
+  const el = document.getElementById('config-alert');
+  el.textContent = msg;
+  el.className = `alert ${type}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+document.getElementById('add-room-btn').onclick = () => {
+  const input = document.getElementById('new-room-input');
+  const val = input.value.trim();
+  if (!val) return;
+  state.config.rooms.push(val);
+  input.value = '';
+  save(state);
+  renderConfigPage();
+  showConfigAlert(`"${val}" añadido.`, 'success');
+};
+document.getElementById('new-room-input').onkeydown = e => { if(e.key==='Enter') document.getElementById('add-room-btn').click(); };
+
+document.getElementById('add-step-btn').onclick = () => {
+  const input = document.getElementById('new-step-input');
+  const val = input.value.trim();
+  if (!val) return;
+  state.config.steps.push(val);
+  input.value = '';
+  save(state);
+  renderConfigPage();
+  showConfigAlert(`"${val}" añadido.`, 'success');
+};
+document.getElementById('new-step-input').onkeydown = e => { if(e.key==='Enter') document.getElementById('add-step-btn').click(); };
+
+/* ---- DATA PAGE ---- */
+function renderDataPage() {
+  const preview = document.getElementById('data-preview');
+  const snapshot = JSON.stringify(state, null, 2);
+  preview.textContent = snapshot.slice(0, 2000) + (snapshot.length > 2000 ? '\n…(truncado)' : '');
+}
+
+document.getElementById('export-btn').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cleantrack-${Date.now()}.json`;
+  a.click();
+};
+
+document.getElementById('import-btn').onclick = () => {
+  const raw = document.getElementById('import-textarea').value.trim();
+  if (!raw) return showDataAlert('Pega un JSON válido primero.', 'error');
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.sessions || !parsed.config) throw new Error('Formato inválido');
+    state = parsed;
+    save(state);
+    renderAll();
+    showDataAlert('Datos importados correctamente.', 'success');
+  } catch(e) {
+    showDataAlert('JSON inválido o formato incorrecto.', 'error');
+  }
+};
+
+document.getElementById('clear-all-btn').onclick = () => {
+  if (!confirm('¿Borrar TODOS los datos? No se puede deshacer.')) return;
+  localStorage.removeItem(LS_KEY);
+  state = load();
+  renderAll();
+  showDataAlert('Todos los datos eliminados.', 'success');
+};
+
+function showDataAlert(msg, type) {
+  const el = document.getElementById('data-alert');
+  el.textContent = msg;
+  el.className = `alert ${type}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+/* ---- NEW SESSION MODAL ---- */
+function openNewSessionModal() {
+  const modal = document.getElementById('new-session-modal');
+  const nameInput = document.getElementById('session-name-input');
+  const info = document.getElementById('modal-info');
+  const rooms = state.config.rooms.length;
+  const steps = state.config.steps.length;
+  info.textContent = `${rooms} estancias × ${steps} pasos = ${rooms*steps} nodos`;
+  const d = new Date();
+  nameInput.value = `Limpieza ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  modal.classList.add('open');
+  setTimeout(() => nameInput.focus(), 300);
+}
+document.getElementById('new-session-btn').onclick = openNewSessionModal;
+document.getElementById('modal-cancel').onclick = () => document.getElementById('new-session-modal').classList.remove('open');
+document.getElementById('new-session-modal').onclick = e => { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); };
+
+document.getElementById('modal-create').onclick = () => {
+  const name = document.getElementById('session-name-input').value.trim();
+  if (!name) { alert('Escribe un nombre.'); return; }
+  const session = {
+    id: genId(),
+    name,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    finished: false,
+    rooms: state.config.rooms.map(r => ({
+      id: genId(),
+      name: r,
+      lastUpdated: null,
+      steps: state.config.steps.map(s => ({ name: s, done: false }))
+    }))
+  };
+  state.sessions.push(session);
+  state.activeSessionId = session.id;
+  save(state);
+  document.getElementById('new-session-modal').classList.remove('open');
+  renderAll();
+  switchPage('session');
+};
+
+/* ---- RENAME MODAL ---- */
+function openRenameModal() {
+  const sess = getActiveSession();
+  if (!sess) return;
+  document.getElementById('rename-input').value = sess.name;
+  document.getElementById('rename-modal').classList.add('open');
+}
+document.getElementById('rename-cancel').onclick = () => document.getElementById('rename-modal').classList.remove('open');
+document.getElementById('rename-modal').onclick = e => { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); };
+document.getElementById('rename-confirm').onclick = () => {
+  const sess = getActiveSession();
+  if (!sess) return;
+  const val = document.getElementById('rename-input').value.trim();
+  if (!val) return;
+  sess.name = val;
+  save(state);
+  document.getElementById('rename-modal').classList.remove('open');
+  renderSessionPage();
+  updateHeader();
+};
+
+/* ---- TABS ---- */
+function switchPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`${pageId}-page`).classList.add('active');
+  document.querySelector(`.nav-tab[data-page="${pageId}"]`).classList.add('active');
+  if (pageId === 'session') renderSessionPage();
+  if (pageId === 'history') renderHistoryPage();
+  if (pageId === 'config') renderConfigPage();
+  if (pageId === 'data') renderDataPage();
+}
+
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.onclick = () => switchPage(tab.dataset.page);
+});
+
+/* ---- UTILS ---- */
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderAll() {
+  updateHeader();
+  renderSessionPage();
+}
+
+/* ---- INIT ---- */
+renderAll();
+</script>
+</body>
+</html>
