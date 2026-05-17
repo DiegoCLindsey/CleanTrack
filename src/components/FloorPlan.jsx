@@ -1,91 +1,155 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 
-function getProgressColor(pct) {
+const GRID = 10
+const snap = v => Math.round(v / GRID) * GRID
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
+
+function progressColor(pct) {
   return `rgba(42, 110, 74, ${(pct * 0.7).toFixed(3)})`
+}
+
+const HANDLES = ['nw', 'ne', 'sw', 'se']
+
+function handlePos(zone, h) {
+  return {
+    x: h.includes('e') ? zone.x + zone.w : zone.x,
+    y: h.includes('s') ? zone.y + zone.h : zone.y,
+  }
 }
 
 export default function FloorPlan({ zones, rooms, progressByRoom, onSaveZones }) {
   const svgRef = useRef(null)
-  const [drawing, setDrawing] = useState(false)
-  const [tempRect, setTempRect] = useState(null)
-  const [startPos, setStartPos] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const [drag, setDrag] = useState(null)
+  const [liveZone, setLiveZone] = useState(null)
   const [pendingRect, setPendingRect] = useState(null)
-  const [selectedZoneId, setSelectedZoneId] = useState(null)
 
-  const getCoords = (e) => {
+  const svgCoords = useCallback((e) => {
     const svg = svgRef.current
-    const rect = svg.getBoundingClientRect()
+    const r = svg.getBoundingClientRect()
     const src = e.touches ? e.touches[0] : e
     return {
-      x: Math.max(0, Math.min(100, ((src.clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((src.clientY - rect.top) / rect.height) * 100)),
+      x: clamp(((src.clientX - r.left) / r.width) * 100, 0, 100),
+      y: clamp(((src.clientY - r.top) / r.height) * 100, 0, 100),
     }
+  }, [])
+
+  // ── Drag start ──────────────────────────────────────────────────────────────
+
+  const onSvgDown = (e) => {
+    e.preventDefault()
+    const { x, y } = svgCoords(e)
+    const sx = snap(x), sy = snap(y)
+    setSelectedId(null)
+    setDrag({ type: 'draw', sx, sy })
+    setLiveZone({ x: sx, y: sy, w: 0, h: 0 })
   }
 
-  const onDown = (e) => {
-    if (e.target.closest('.zone-g')) return
+  const onZoneDown = (e, zone) => {
+    e.stopPropagation()
     e.preventDefault()
-    const pos = getCoords(e)
-    setStartPos(pos)
-    setDrawing(true)
-    setTempRect({ x: pos.x, y: pos.y, w: 0, h: 0 })
-    setSelectedZoneId(null)
+    const pos = svgCoords(e)
+    setSelectedId(zone.id)
+    setDrag({ type: 'move', zoneId: zone.id, sx: pos.x, sy: pos.y, orig: { ...zone } })
+    setLiveZone({ ...zone })
   }
+
+  const onHandleDown = (e, zone, handle) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setDrag({ type: 'resize', zoneId: zone.id, handle, orig: { ...zone } })
+    setLiveZone({ ...zone })
+  }
+
+  // ── Drag move ───────────────────────────────────────────────────────────────
 
   const onMove = (e) => {
-    if (!drawing || !startPos) return
+    if (!drag) return
     e.preventDefault()
-    const pos = getCoords(e)
-    setTempRect({
-      x: Math.min(startPos.x, pos.x),
-      y: Math.min(startPos.y, pos.y),
-      w: Math.abs(pos.x - startPos.x),
-      h: Math.abs(pos.y - startPos.y),
-    })
+    const { x, y } = svgCoords(e)
+
+    if (drag.type === 'draw') {
+      const ex = snap(x), ey = snap(y)
+      setLiveZone({
+        x: Math.min(drag.sx, ex), y: Math.min(drag.sy, ey),
+        w: Math.abs(ex - drag.sx), h: Math.abs(ey - drag.sy),
+      })
+    } else if (drag.type === 'move') {
+      const o = drag.orig
+      const dx = snap(x - drag.sx), dy = snap(y - drag.sy)
+      setLiveZone({
+        ...o,
+        x: clamp(snap(o.x + dx), 0, 100 - o.w),
+        y: clamp(snap(o.y + dy), 0, 100 - o.h),
+      })
+    } else if (drag.type === 'resize') {
+      const o = drag.orig
+      const ex = snap(clamp(x, 0, 100))
+      const ey = snap(clamp(y, 0, 100))
+      const h = drag.handle
+      let { x: rx, y: ry, w: rw, h: rh } = o
+
+      if (h.includes('e')) { rw = Math.max(GRID, ex - o.x) }
+      if (h.includes('w')) { rw = Math.max(GRID, o.x + o.w - ex); rx = o.x + o.w - rw }
+      if (h.includes('s')) { rh = Math.max(GRID, ey - o.y) }
+      if (h.includes('n')) { rh = Math.max(GRID, o.y + o.h - ey); ry = o.y + o.h - rh }
+
+      setLiveZone({ ...o, x: rx, y: ry, w: rw, h: rh })
+    }
   }
 
+  // ── Drag end ────────────────────────────────────────────────────────────────
+
   const onUp = (e) => {
-    if (!drawing) return
+    if (!drag) return
     e.preventDefault()
-    setDrawing(false)
-    if (tempRect && tempRect.w > 3 && tempRect.h > 3) {
-      setPendingRect({ ...tempRect })
+
+    if (drag.type === 'draw') {
+      if (liveZone?.w >= GRID && liveZone?.h >= GRID) setPendingRect({ ...liveZone })
+    } else if ((drag.type === 'move' || drag.type === 'resize') && liveZone) {
+      onSaveZones(zones.map(z => z.id === drag.zoneId ? { ...z, ...liveZone } : z))
     }
-    setTempRect(null)
-    setStartPos(null)
+
+    setDrag(null)
+    setLiveZone(null)
   }
+
+  // ── Other actions ───────────────────────────────────────────────────────────
 
   const assignRoom = (roomName) => {
     if (!pendingRect) return
-    const newZone = { id: crypto.randomUUID(), roomName, ...pendingRect }
-    onSaveZones([...zones, newZone])
+    onSaveZones([...zones, { id: crypto.randomUUID(), roomName, ...pendingRect }])
     setPendingRect(null)
   }
 
   const deleteZone = (id, e) => {
     e?.stopPropagation()
     onSaveZones(zones.filter(z => z.id !== id))
-    setSelectedZoneId(null)
+    setSelectedId(null)
   }
+
+  const ez = (zone) =>
+    liveZone && drag?.zoneId === zone.id ? { ...zone, ...liveZone } : zone
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div>
-      {/* Canvas */}
       <div className="floorplan-wrap">
         <svg
           ref={svgRef}
           className="floorplan-svg"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
-          onMouseDown={onDown}
+          onMouseDown={onSvgDown}
           onMouseMove={onMove}
           onMouseUp={onUp}
           onMouseLeave={onUp}
-          onTouchStart={onDown}
+          onTouchStart={onSvgDown}
           onTouchMove={onMove}
           onTouchEnd={onUp}
         >
-          {/* Grid background */}
+          {/* Grid */}
           <defs>
             <pattern id="fp-grid" width="10" height="10" patternUnits="userSpaceOnUse">
               <path d="M10 0 L0 0 0 10" fill="none" stroke="var(--border)" strokeWidth="0.4" />
@@ -94,122 +158,109 @@ export default function FloorPlan({ zones, rooms, progressByRoom, onSaveZones })
           <rect width="100" height="100" fill="var(--surface)" />
           <rect width="100" height="100" fill="url(#fp-grid)" />
 
-          {/* Existing zones */}
+          {/* Zones */}
           {zones.map((zone) => {
+            const z = ez(zone)
             const pct = progressByRoom?.[zone.roomName] ?? 0
-            const isSelected = zone.id === selectedZoneId
+            const sel = zone.id === selectedId
             return (
-              <g
-                key={zone.id}
-                className="zone-g"
-                onClick={() => setSelectedZoneId(isSelected ? null : zone.id)}
-                style={{ cursor: 'pointer' }}
-              >
+              <g key={zone.id}>
+                {/* Zone body */}
                 <rect
-                  x={zone.x} y={zone.y} width={zone.w} height={zone.h}
-                  fill={getProgressColor(pct)}
-                  stroke={pct > 0 ? 'var(--accent)' : 'var(--border2)'}
-                  strokeWidth={isSelected ? 0.8 : 0.5}
-                  strokeDasharray={isSelected ? '2 1' : 'none'}
-                  rx="0.8"
+                  x={z.x} y={z.y} width={z.w} height={z.h}
+                  fill={progressColor(pct)}
+                  stroke={sel ? 'var(--accent)' : (pct > 0 ? 'var(--accent-mid)' : 'var(--border2)')}
+                  strokeWidth={sel ? 0.8 : 0.5}
+                  strokeDasharray={sel ? '2 1' : 'none'}
+                  style={{ cursor: drag?.type === 'move' && drag.zoneId === zone.id ? 'grabbing' : 'grab' }}
+                  onMouseDown={(e) => onZoneDown(e, zone)}
+                  onTouchStart={(e) => onZoneDown(e, zone)}
+                  onClick={() => setSelectedId(sel ? null : zone.id)}
                 />
-                {/* Room label */}
-                {zone.w > 8 && zone.h > 6 && (
+
+                {/* Room name */}
+                {z.w > 8 && z.h > 6 && (
                   <text
-                    x={zone.x + zone.w / 2}
-                    y={zone.y + zone.h / 2 - (zone.h > 10 ? 1.5 : 0)}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={Math.max(2.2, Math.min(4, zone.w / 8))}
+                    x={z.x + z.w / 2} y={z.y + z.h / 2 - (z.h > 10 ? 1.5 : 0)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={Math.max(2.2, Math.min(4, z.w / 8))}
                     fill="var(--text)"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
-                  >
-                    {zone.roomName}
-                  </text>
+                  >{zone.roomName}</text>
                 )}
+
                 {/* Progress % */}
-                {zone.w > 8 && zone.h > 10 && (
+                {z.w > 8 && z.h > 10 && (
                   <text
-                    x={zone.x + zone.w / 2}
-                    y={zone.y + zone.h / 2 + 3}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
+                    x={z.x + z.w / 2} y={z.y + z.h / 2 + 3}
+                    textAnchor="middle" dominantBaseline="middle"
                     fontSize="2.5"
                     fill={pct > 0 ? 'var(--accent)' : 'var(--text3)'}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
-                  >
-                    {Math.round(pct * 100)}%
-                  </text>
+                  >{Math.round(pct * 100)}%</text>
                 )}
-                {/* Delete button when selected */}
-                {isSelected && (
+
+                {/* Selection: resize handles + delete */}
+                {sel && HANDLES.map(h => {
+                  const hp = handlePos(z, h)
+                  return (
+                    <rect
+                      key={h}
+                      x={hp.x - 1.5} y={hp.y - 1.5} width="3" height="3"
+                      fill="var(--surface)" stroke="var(--accent)" strokeWidth="0.6"
+                      style={{ cursor: 'nwse-resize' }}
+                      onMouseDown={(e) => onHandleDown(e, zone, h)}
+                      onTouchStart={(e) => onHandleDown(e, zone, h)}
+                    />
+                  )
+                })}
+                {sel && (
                   <g onClick={(e) => deleteZone(zone.id, e)} style={{ cursor: 'pointer' }}>
-                    <circle cx={zone.x + zone.w} cy={zone.y} r="3" fill="var(--danger)" />
+                    <circle cx={z.x + z.w} cy={z.y} r="3" fill="var(--danger)" />
                     <text
-                      x={zone.x + zone.w} y={zone.y}
+                      x={z.x + z.w} y={z.y}
                       textAnchor="middle" dominantBaseline="middle"
                       fontSize="3" fill="white"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
-                    >
-                      ✕
-                    </text>
+                    >✕</text>
                   </g>
                 )}
               </g>
             )
           })}
 
-          {/* Temp rect while drawing */}
-          {tempRect && tempRect.w > 0 && (
+          {/* Drawing preview */}
+          {drag?.type === 'draw' && liveZone?.w > 0 && (
             <rect
-              x={tempRect.x} y={tempRect.y} width={tempRect.w} height={tempRect.h}
+              x={liveZone.x} y={liveZone.y} width={liveZone.w} height={liveZone.h}
               fill="rgba(42,110,74,0.12)"
-              stroke="var(--accent)"
-              strokeWidth="0.6"
-              strokeDasharray="2 1"
-              rx="0.8"
+              stroke="var(--accent)" strokeWidth="0.6" strokeDasharray="2 1"
             />
           )}
         </svg>
       </div>
 
-      {/* Room picker after drawing */}
+      {/* Room picker */}
       {pendingRect && (
         <div className="floorplan-picker">
           <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>
             ¿A qué estancia pertenece esta zona?
           </p>
           <div className="btn-row">
-            {rooms.map((room) => (
-              <button key={room} className="btn sm" onClick={() => assignRoom(room)}>
-                {room}
-              </button>
+            {rooms.map(room => (
+              <button key={room} className="btn sm" onClick={() => assignRoom(room)}>{room}</button>
             ))}
-            <button className="btn sm danger" onClick={() => setPendingRect(null)}>
-              Cancelar
-            </button>
+            <button className="btn sm danger" onClick={() => setPendingRect(null)}>Cancelar</button>
           </div>
         </div>
       )}
 
-      {/* Legend */}
       <div className="floorplan-legend">
-        {zones.length === 0 ? (
-          <span>Dibuja un rectángulo para añadir una zona</span>
-        ) : (
-          <>
-            <span>Haz clic en una zona para seleccionarla · </span>
-            <span>
-              {rooms
-                .filter((r) => !zones.find((z) => z.roomName === r))
-                .map((r) => <span key={r} style={{ color: 'var(--warn)' }}>{r} sin zona · </span>)
-              }
-            </span>
-          </>
-        )}
+        {zones.length === 0
+          ? 'Dibuja un rectángulo para añadir una zona'
+          : 'Arrastra para mover · Esquinas para redimensionar · Clic para seleccionar'}
       </div>
 
-      {/* Color scale */}
       <div className="floorplan-scale">
         <span>0%</span>
         <div className="floorplan-scale-bar" />
