@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import RoomCard from '../components/RoomCard.jsx'
 import Modal from '../components/Modal.jsx'
 import FloorPlan from '../components/FloorPlan.jsx'
+import { computeWeights, calcWeightedProgress } from '../utils/weights.js'
 
 const TABS = [
   { id: 'session', label: 'Sesión' },
@@ -32,16 +33,6 @@ function fmtDateTime(ts) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function calcProgress(session) {
-  let done = 0, total = 0
-  for (const room of session.rooms ?? []) {
-    for (const step of room.steps ?? []) {
-      total++
-      if (step.done) done++
-    }
-  }
-  return { done, total, pct: total === 0 ? 0 : Math.round((done / total) * 100) }
-}
 
 export default function ListPage() {
   const { listId } = useParams()
@@ -91,14 +82,19 @@ export default function ListPage() {
 
   const activeSession = sessions.find(s => s.id === selectedSessionId) ?? null
 
-  // Progress for header ring
+  // Weights (live — recalculated whenever list or zones change)
+  const weights = list
+    ? computeWeights(list.rooms ?? [], list.roomWeights, list.zones)
+    : {}
+
+  // Progress for header ring (weighted pct, raw done/total)
   const { done, total, pct } = activeSession && !activeSession.finished
-    ? calcProgress(activeSession)
+    ? calcWeightedProgress(activeSession, weights)
     : { done: 0, total: 0, pct: 0 }
 
   const circ = 2 * Math.PI * 16
 
-  // Progress per room name (0–1) for the floor plan
+  // Per-room progress ratio (0–1) for floor plan coloring
   const progressByRoom = {}
   if (activeSession && !activeSession.finished) {
     for (const room of activeSession.rooms ?? []) {
@@ -110,6 +106,11 @@ export default function ListPage() {
 
   const saveZones = (newZones) =>
     updateDoc(doc(db, 'lists', listId), { zones: newZones })
+
+  const updateRoomWeight = (roomName, setting) =>
+    updateDoc(doc(db, 'lists', listId), {
+      [`roomWeights.${roomName}`]: setting,
+    })
 
   // ── Session actions ─────────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ export default function ListPage() {
               </div>
             ) : (
               sessions.map(sess => {
-                const { done: sd, total: st, pct: sp } = calcProgress(sess)
+                const { done: sd, total: st, pct: sp } = calcWeightedProgress(sess, weights)
                 const isActive = sess.id === selectedSessionId && !sess.finished
                 return (
                   <div key={sess.id} className="hist-card" onClick={() => openSession(sess)}>
@@ -416,6 +417,60 @@ export default function ListPage() {
             <p style={{ fontSize: 13, color: 'var(--text2)' }}>
               Los cambios se aplican a las nuevas sesiones. Las sesiones ya creadas no se modifican.
             </p>
+
+            {/* Ponderaciones */}
+            <div className="config-section" style={{ marginTop: 28 }}>
+              <h3>Ponderaciones</h3>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+                Cuánto contribuye cada estancia al progreso total.
+              </p>
+              <div className="weight-list">
+                {list.rooms.map(name => {
+                  const setting = list.roomWeights?.[name] ?? { mode: 'estimate', value: null }
+                  const mode = setting.mode ?? 'estimate'
+                  const effectivePct = Math.round((weights[name] ?? 0) * 100)
+                  const hasMapArea = (list.zones ?? []).some(z => z.roomName === name)
+                  return (
+                    <div key={name} className="weight-item">
+                      <span className="weight-name">{name}</span>
+                      <select
+                        className="weight-mode"
+                        value={mode}
+                        onChange={e => updateRoomWeight(name, { ...setting, mode: e.target.value })}
+                      >
+                        <option value="estimate">Estimación</option>
+                        <option value="fixed">Fijo</option>
+                      </select>
+                      {mode === 'fixed' && (
+                        <input
+                          type="number"
+                          className="weight-input"
+                          value={setting.value ?? ''}
+                          min="0"
+                          step="0.1"
+                          placeholder="1"
+                          onChange={e => updateRoomWeight(name, {
+                            ...setting,
+                            value: e.target.value === '' ? null : Number(e.target.value),
+                          })}
+                        />
+                      )}
+                      {mode === 'estimate' && (
+                        <span className="weight-hint">
+                          {hasMapArea ? 'del mapa' : 'igual'}
+                        </span>
+                      )}
+                      <span className="weight-pct">{effectivePct}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+                {(list.zones ?? []).length > 0
+                  ? 'Estimación usa el área de las zonas del mapa.'
+                  : 'Sin zonas en el mapa: estimación pondera todas igual.'}
+              </p>
+            </div>
           </>
         )}
 

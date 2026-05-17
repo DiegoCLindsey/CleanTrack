@@ -333,6 +333,34 @@ input[type="text"]:focus, input[type="email"]:focus { border-color: var(--accent
 /* ---- LOADING ---- */
 .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--text3); font-family: 'DM Mono', monospace; font-size: 13px; }
 
+/* ---- WEIGHT EDITOR ---- */
+.weight-list { display: flex; flex-direction: column; gap: 6px; }
+.weight-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.weight-name { flex: 1; font-size: 14px; font-weight: 500; min-width: 70px; }
+.weight-mode {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; font-size: 12px;
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  cursor: pointer; outline: none;
+}
+.weight-mode:focus { border-color: var(--accent); }
+.weight-input {
+  width: 62px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; font-size: 12px;
+  font-family: 'DM Mono', monospace; color: var(--text);
+  outline: none; text-align: right;
+}
+.weight-input:focus { border-color: var(--accent); }
+.weight-hint { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.weight-pct {
+  font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+  color: var(--accent); min-width: 38px; text-align: right;
+}
+
 /* ---- FLOOR PLAN ---- */
 .floorplan-wrap {
   border: 1px solid var(--border); border-radius: var(--radius);
