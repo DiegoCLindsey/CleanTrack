@@ -333,6 +333,28 @@ input[type="text"]:focus, input[type="email"]:focus { border-color: var(--accent
 /* ---- LOADING ---- */
 .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--text3); font-family: 'DM Mono', monospace; font-size: 13px; }
 
+/* ---- FLOOR PLAN ---- */
+.floorplan-wrap {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; aspect-ratio: 4 / 3; cursor: crosshair;
+  box-shadow: var(--shadow);
+}
+.floorplan-svg { display: block; width: 100%; height: 100%; user-select: none; touch-action: none; }
+.floorplan-picker {
+  background: var(--accent-light); border: 1px solid var(--accent-mid);
+  border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 12px;
+}
+.floorplan-legend { font-size: 11px; color: var(--text3); margin-top: 10px; }
+.floorplan-scale {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3);
+}
+.floorplan-scale-bar {
+  flex: 1; height: 8px; border-radius: 4px;
+  background: linear-gradient(to right, rgba(42,110,74,0.05), rgba(42,110,74,0.7));
+  border: 1px solid var(--border);
+}
+
 /* ---- RESPONSIVE ---- */
 @media (min-width: 480px) {
   .node { width: 48px; height: 48px; }

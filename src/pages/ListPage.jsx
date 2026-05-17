@@ -8,9 +8,11 @@ import { db } from '../firebase'
 import { useAuth } from '../hooks/useAuth.jsx'
 import RoomCard from '../components/RoomCard.jsx'
 import Modal from '../components/Modal.jsx'
+import FloorPlan from '../components/FloorPlan.jsx'
 
 const TABS = [
   { id: 'session', label: 'Sesión' },
+  { id: 'map', label: 'Mapa' },
   { id: 'history', label: 'Historial' },
   { id: 'config', label: 'Configurar' },
   { id: 'share', label: 'Compartir' },
@@ -95,6 +97,19 @@ export default function ListPage() {
     : { done: 0, total: 0, pct: 0 }
 
   const circ = 2 * Math.PI * 16
+
+  // Progress per room name (0–1) for the floor plan
+  const progressByRoom = {}
+  if (activeSession && !activeSession.finished) {
+    for (const room of activeSession.rooms ?? []) {
+      const t = room.steps?.length ?? 0
+      const d = room.steps?.filter(s => s.done).length ?? 0
+      progressByRoom[room.name] = t === 0 ? 0 : d / t
+    }
+  }
+
+  const saveZones = (newZones) =>
+    updateDoc(doc(db, 'lists', listId), { zones: newZones })
 
   // ── Session actions ─────────────────────────────────────────────────────────
 
@@ -288,6 +303,16 @@ export default function ListPage() {
               </>
             )}
           </>
+        )}
+
+        {/* ── MAPA ── */}
+        {tab === 'map' && list && (
+          <FloorPlan
+            zones={list.zones ?? []}
+            rooms={list.rooms ?? []}
+            progressByRoom={progressByRoom}
+            onSaveZones={saveZones}
+          />
         )}
 
         {/* ── HISTORIAL ── */}
